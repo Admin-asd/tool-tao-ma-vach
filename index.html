@@ -1,0 +1,162 @@
+<!doctype html>
+<!-- Vị trí file: wp-content/gb-tools/developer-tools/tao-ma-vạch.html -->
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Công cụ tạo mã vạch online - Barcode Generator miễn phí</title>
+<meta name="description" content="Tạo mã vạch online nhanh chóng, chính xác các định dạng Code 128, EAN, UPC. Tùy chỉnh kích thước, tải xuống ảnh mã vạch PNG hoặc SVG miễn phí.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.1.11"></script>
+<!-- Thư viện JsBarcode để tạo mã vạch -->
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<style type="text/tailwindcss">
+  @theme {
+    --font-sans: Roboto, ui-sans-serif, system-ui, sans-serif;
+    --color-primary: #fdca1e; --color-primary-hover: #e8b008; --color-primary-soft: #fffbeb;
+    --color-primary-ink: #9c6406; --color-ink: #0f172a; --color-neutral: #e5e7eb;
+  }
+</style>
+</head>
+<body class="bg-white font-sans text-ink antialiased">
+<main class="mx-auto max-w-5xl p-4 sm:p-6">
+  <div class="space-y-6">
+    <!-- Cấu hình tạo mã vạch -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <!-- Nhập nội dung -->
+      <div class="sm:col-span-2">
+        <label for="barcodeInput" class="block font-bold text-ink mb-2">Nội dung mã vạch</label>
+        <input type="text" id="barcodeInput" value="GOLDENBEE2026" oninput="generateBarcode()" placeholder="Nhập chuỗi ký tự hoặc mã số..." class="w-full rounded-xl border border-neutral p-3 outline-none focus:border-primary focus:ring-2 focus:ring-primary/60 font-mono text-sm">
+      </div>
+
+      <!-- Loại mã vạch -->
+      <div>
+        <label for="barcodeFormat" class="block font-bold text-ink mb-2">Định dạng mã vạch</label>
+        <select id="barcodeFormat" onchange="generateBarcode()" class="w-full rounded-xl border border-neutral p-3 outline-none focus:border-primary focus:ring-2 focus:ring-primary/60 bg-white">
+          <option value="CODE128">Code 128 (Phổ biến, hỗ trợ chữ và số)</option>
+          <option value="EAN13">EAN-13 (Mã vạch sản phẩm 13 số)</option>
+          <option value="UPC">UPC-A (Mã vạch sản phẩm Mỹ)</option>
+          <option value="CODE39">Code 39 (Chữ in hoa và số)</option>
+          <option value="ITF">ITF-14 (Dùng cho bao bì kho vận)</option>
+        </select>
+      </div>
+
+      <!-- Chiều cao mã vạch -->
+      <div>
+        <label for="barcodeHeight" class="block font-bold text-ink mb-2">Chiều cao mã vạch: <span id="heightVal">80</span>px</label>
+        <input type="range" id="barcodeHeight" min="40" max="150" value="80" oninput="document.getElementById('heightVal').textContent=this.value; generateBarcode()" class="w-full accent-primary cursor-pointer mt-3">
+      </div>
+    </div>
+
+    <!-- Tùy chọn hiển thị thêm -->
+    <div class="flex flex-wrap items-center gap-6 pt-2">
+      <label class="flex items-center gap-2 cursor-pointer select-none">
+        <input type="checkbox" id="showText" checked onchange="generateBarcode()" class="w-4 h-4 accent-primary rounded">
+        <span class="text-sm font-semibold">Hiển thị văn bản bên dưới</span>
+      </label>
+    </div>
+
+    <!-- Khu vực hiển thị kết quả mã vạch -->
+    <div class="border border-neutral rounded-2xl p-6 bg-slate-50 flex flex-col items-center justify-center min-h-[220px]">
+      <div id="errorMsg" class="text-red-600 text-sm font-semibold mb-3 hidden"></div>
+      <div class="bg-white p-6 rounded-xl border border-neutral shadow-sm flex items-center justify-center max-w-full overflow-x-auto">
+        <svg id="barcodeCanvasTarget"></svg>
+      </div>
+      
+      <!-- Nút tải xuống -->
+      <div class="flex flex-wrap gap-3 mt-6">
+        <button type="button" onclick="downloadBarcode('png')" class="min-h-11 rounded-xl bg-primary px-5 font-bold hover:bg-primary-hover shadow-sm">
+          Tải ảnh PNG
+        </button>
+        <button type="button" onclick="downloadBarcode('svg')" class="min-h-11 rounded-xl border border-neutral px-5 font-semibold hover:border-primary bg-white">
+          Tải file SVG
+        </button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  async function gbCopy(text) {
+    try { await navigator.clipboard.writeText(text); return true; } catch (e) {}
+    const t = document.createElement('textarea'); t.value = text; t.style.position = 'fixed'; t.style.opacity = '0';
+    document.body.appendChild(t); t.select(); const ok = document.execCommand('copy'); t.remove(); return ok;
+  }
+  function gbDownload(data, filename, type = 'application/octet-stream') {
+    const url = URL.createObjectURL(data instanceof Blob ? data : new Blob([data], { type }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  const gbStore = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+
+  function generateBarcode() {
+    const input = document.getElementById('barcodeInput').value.trim();
+    const format = document.getElementById('barcodeFormat').value;
+    const height = parseInt(document.getElementById('barcodeHeight').value, 10);
+    const displayValue = document.getElementById('showText').checked;
+    const errorMsg = document.getElementById('errorMsg');
+
+    if (!input) {
+      errorMsg.textContent = 'Vui lòng nhập nội dung để tạo mã vạch.';
+      errorMsg.classList.remove('hidden');
+      return;
+    }
+
+    try {
+      JsBarcode("#barcodeCanvasTarget", input, {
+        format: format,
+        height: height,
+        displayValue: displayValue,
+        fontSize: 16,
+        margin: 10, lineColor: "#0f172a", width: 2
+      });
+      errorMsg.classList.add('hidden');
+    } catch (e) {
+      errorMsg.textContent = 'Dữ liệu không hợp lệ với định dạng mã vạch đã chọn (Ví dụ: EAN-13 yêu cầu đúng 13 chữ số).';
+      errorMsg.classList.remove('hidden');
+    }
+  }
+
+  function downloadBarcode(type) {
+    const svgElem = document.getElementById('barcodeCanvasTarget');
+    if (!svgElem || svgElem.childElementCount === 0) return;
+
+    if (type === 'svg') {
+      const serializer = new XMLSerializer();
+      let source = serializer.serializeToString(svgElem);
+      if(!source.match(/^<svg[^>]+xmlns="xmlns\s*=/)) {
+        source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+      }
+      const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+      gbDownload(blob, 'barcode.svg');
+    } else if (type === 'png') {
+      const serializer = new XMLSerializer();
+      const svgString = serializer.serializeToString(svgElem);
+      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      const URL = window.URL || window.webkitURL || window;
+      const blobURL = URL.createObjectURL(svgBlob);
+      const image = new Image();
+      
+      image.onload = function() {
+        const canvas = document.createElement('canvas');
+        canvas.width = image.width || svgElem.clientWidth;
+        canvas.height = image.height || svgElem.clientHeight;
+        const context = canvas.getContext('2d');
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0);
+        
+        canvas.toBlob(function(blob) {
+          gbDownload(blob, 'barcode.png');
+        }, 'image/png');
+      };
+      image.src = blobURL;
+    }
+  }
+
+  // Khởi tạo lần đầu
+  generateBarcode();
+</script>
+</body>
+</html>
